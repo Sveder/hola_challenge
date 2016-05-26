@@ -1,6 +1,10 @@
+import gzip
 import json
+from StringIO import StringIO
 from collections import defaultdict
 
+
+EXPECTED_FILE_SIZE = 64000
 words = open("words.txt").read().lower().split("\n")
 
 
@@ -29,15 +33,41 @@ def save_formatted_list(appearance_count, fobj):
     item_count = float(sum(appearance_count.values()))
 
     for item in appearance_count:
-        appearance_count[item] = float(appearance_count[item]) / item_count
+        appearance_count[item] = "%.15f" % (float(appearance_count[item]) / item_count)
 
-    json.dump(appearance_count, fobj)
+    current_size = EXPECTED_FILE_SIZE + 1
+    while current_size > EXPECTED_FILE_SIZE:
+        minimums = []
+        for i in xrange(10):
+            minimums.append(min(appearance_count.values()))
+        appearance_count = {k:v for k,v in appearance_count.items() if v not in minimums}
+
+        out = StringIO()
+        with gzip.GzipFile(fileobj=out, mode='w') as f:
+            f.write(json.dumps(appearance_count))
+
+        compressed = out.getvalue()
+        current_size = len(compressed)
+        print current_size
+
+    json.dump(appearance_count, fobj, separators=(',',':'))
 
 
-two_gram = ngram_list_of_words(words, 3)
-two_gram_file = open("formatted_three.txt", 'w')
-save_formatted_list(two_gram, two_gram_file)
-two_gram_file.close()
+def save_file(fname, appearance_count, should_gzip=False):
+    if should_gzip:
+        fobj = gzip.open(fname, 'w')
+    else:
+        fobj = open(fname, 'w')
 
-import ipdb;ipdb.set_trace()
+    save_formatted_list(appearance_count, fobj)
+    return fobj
 
+all_gram = ngram_list_of_words(words, 2)
+all_gram.update(ngram_list_of_words(words, 3))
+
+strio = save_file("two_and_three.txt", all_gram, True)
+
+
+
+# import ipdb;ipdb.set_trace()
+#
